@@ -1,50 +1,59 @@
 import speech_recognition as sr
 import os
-import webbrowser
-import openai
-from config import apikey
+import pyttsx3
 import datetime
-import random
-import numpy as np
+import wikipedia
+from openai import OpenAI
 
+
+engine = pyttsx3.init()
 
 chatStr = ""
-# https://youtu.be/Z3ZAJoi4x6Q
 def chat(query):
+    client = OpenAI()
     global chatStr
     print(chatStr)
-    openai.api_key = apikey
-    chatStr += f"Harry: {query}\n Jarvis: "
-    response = openai.Completion.create(
-        model="text-davinci-003",
-        prompt= chatStr,
-        temperature=0.7,
+    chatStr += f"user: {query}\n voice: "
+
+    response = client.chat.completions.create(
+        model="gpt-3.5-turbo",
+        temperature=1,
         max_tokens=256,
         top_p=1,
         frequency_penalty=0,
         presence_penalty=0
     )
-    # todo: Wrap this inside of a  try catch block
-    say(response["choices"][0]["text"])
+    speak(response["choices"][0]["text"])
     chatStr += f"{response['choices'][0]['text']}\n"
     return response["choices"][0]["text"]
 
 
 def ai(prompt):
-    openai.api_key = apikey
+    client = OpenAI()
     text = f"OpenAI response for Prompt: {prompt} \n *************************\n\n"
-
-    response = openai.Completion.create(
-        model="text-davinci-003",
-        prompt=prompt,
-        temperature=0.7,
+    response = client.chat.completions.create(
+        model="gpt-3.5-turbo",
+        messages=[
+            {
+                "role": "system",
+                "content": "write email for resignation\n"
+            },
+            {
+                "role": "user",
+                "content": "how are you "
+            },
+            {
+                "role": "assistant",
+                "content": "i am fine"
+            }
+        ],
+        temperature=1,
         max_tokens=256,
         top_p=1,
         frequency_penalty=0,
         presence_penalty=0
     )
-    # todo: Wrap this inside of a  try catch block
-    # print(response["choices"][0]["text"])
+
     text += response["choices"][0]["text"]
     if not os.path.exists("Openai"):
         os.mkdir("Openai")
@@ -52,67 +61,81 @@ def ai(prompt):
     # with open(f"Openai/prompt- {random.randint(1, 2343434356)}", "w") as f:
     with open(f"Openai/{''.join(prompt.split('intelligence')[1:]).strip() }.txt", "w") as f:
         f.write(text)
+def speak(text):
+    engine.say(text)
+    engine.runAndWait()
 
-def say(text):
-    os.system(f'say "{text}"')
 
-def takeCommand():
+# Function to recognize speech
+def listen():
     r = sr.Recognizer()
     with sr.Microphone() as source:
-        # r.pause_threshold =  0.6
-        audio = r.listen(source)
-        try:
-            print("Recognizing...")
-            query = r.recognize_google(audio, language="en-in")
-            print(f"User said: {query}")
-            return query
-        except Exception as e:
-            return "Some Error Occurred. Sorry from Jarvis"
-
-if __name__ == '__main__':
-    print('Welcome to Jarvis A.I')
-    say("Jarvis A.I")
-    while True:
         print("Listening...")
-        query = takeCommand()
-        # todo: Add more sites
-        sites = [["youtube", "https://www.youtube.com"], ["wikipedia", "https://www.wikipedia.com"], ["google", "https://www.google.com"],]
-        for site in sites:
-            if f"Open {site[0]}".lower() in query.lower():
-                say(f"Opening {site[0]} sir...")
-                webbrowser.open(site[1])
-        # todo: Add a feature to play a specific song
-        if "open music" in query:
-            musicPath = "/Users/harry/Downloads/downfall-21371.mp3"
-            os.system(f"open {musicPath}")
+        r.pause_threshold = 1
+        audio = r.listen(source)
+    try:
+        print("Recognizing...")
+        query = r.recognize_google(audio, language='en-in')
+        print(f"User said: {query}\n")
+    except Exception as e:
+        print("Say that again please...")
+        return "None"
+    return query.lower()
 
-        elif "the time" in query:
-            musicPath = "/Users/harry/Downloads/downfall-21371.mp3"
-            hour = datetime.datetime.now().strftime("%H")
-            min = datetime.datetime.now().strftime("%M")
-            say(f"Sir time is {hour} bajke {min} minutes")
 
-        elif "open facetime".lower() in query.lower():
-            os.system(f"open /System/Applications/FaceTime.app")
+# Function to greet
+def greet():
+    hour = int(datetime.datetime.now().hour)
+    if hour >= 0 and hour < 12:
+        speak("Good Morning!")
+    elif hour >= 12 and hour < 18:
+        speak("Good Afternoon!")
+    else:
+        speak("Good Evening!")
+    speak("I am Voice. How may I assist you?")
 
-        elif "open pass".lower() in query.lower():
-            os.system(f"open /Applications/Passky.app")
 
-        elif "Using artificial intelligence".lower() in query.lower():
+# Main function
+def main():
+    greet()
+    while True:
+        query = listen()
+        if 'wikipedia' in query:
+            speak('Searching Wikipedia...')
+            query = query.replace("wikipedia", "")
+            results = wikipedia.summary(query, sentences=2)
+            speak("According to Wikipedia")
+            print(results)
+            speak(results)
+        elif 'open youtube' in query:
+            speak("Opening Youtube sir ")
+            os.system("start https://www.youtube.com")
+        elif 'open google' in query:
+            speak("Opening Google")
+            os.system("start https://www.google.com")
+        elif 'open chrome' in query:
+            speak("Opening Chrome")
+            os.system('start chrome "" --kiosk')
+        elif 'the time' in query:
+            hor = datetime.datetime.now().strftime("%H")
+            mine = datetime.datetime.now().strftime("%M")
+            speak(f"The time is{hor} hour {mine} minutes")
+        elif 'weather' in query:
+            speak("so today's weather is as follows: ")
+            os.system("start https://www.google.com/search?q=weather+of+today&gs_ivs=1#tts=0")
+        elif 'goodbye' in query:
+            speak("Goodbye! and take care")
+            break
+
+        elif "Using AI".lower() in query:
             ai(prompt=query)
 
-        elif "Jarvis Quit".lower() in query.lower():
-            exit()
-
-        elif "reset chat".lower() in query.lower():
+        elif "reset chat".lower() in query:
             chatStr = ""
 
         else:
-            print("Chatting...")
-            chat(query)
 
+            speak("Sorry, I couldn't understand that")
 
-
-
-
-        # say(query)
+if __name__ == "__main__":
+    main()
